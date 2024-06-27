@@ -14,25 +14,39 @@ public static class ExtensionMethods
 
 public class DungeonMiner : MonoBehaviour
 {
+    #region params
+    GridSettings gridSettings;
+
+    private class Voxel
+    {
+        public GameObject gameObject;
+        public VoxelType type;
+    }
+
+    public enum VoxelType
+    {
+        Default,
+        Agent,
+        Room,
+        Corridor,
+        Up,
+        NewLayer
+    }
+
     public GameObject voxelPrefab;
     public int gridWidth = 100;
     public int gridHeight = 101;
     public int gridDepth = 100;
     private Voxel[,,] grid;
 
-    public Vector3Int agentPosition;
-
-    private static Color originalVoxelColor = new Color(0.5f, 0.5f, 0.5f); // Grigio medio con trasparenza
-    private static Color agentVoxelColor = new Color(0.0f, 0.0f, 1.0f); // Blu per l'agente
-    private Color color = Color.white; // Default to white for safety
-    private float alpha = 1.0f; // Default to no transparency for most cases
-
-    GridSettings gridSettings;
-
     private Dictionary<Vector3Int, Chunk> chunks = new Dictionary<Vector3Int, Chunk>();
 
-    private float actionTimer = 0f; // Timer per le azioni dell'agente
-    private float actionCooldown = 0.0001f; // Tempo di attesa tra le azioni dell'agente, in secondi
+    private Color color = Color.white;
+    private float alpha = 1.0f;
+
+    public Vector3Int agentPosition;
+    private Vector3Int previousAgentPosition = new Vector3Int(-1, -1, -1); // Inizializza a un valore non valido
+    private Vector3Int lastCorridorDirection = new Vector3Int(0, 0, 0);
 
     private static Vector3Int[] possibleDirections = new Vector3Int[] {
         new Vector3Int(1, 0, 0), // destra
@@ -40,9 +54,6 @@ public class DungeonMiner : MonoBehaviour
         new Vector3Int(0, 0, 1), // avanti
         new Vector3Int(0, 0, -1) // indietro
     };
-
-    private Vector3Int previousAgentPosition = new Vector3Int(-1, -1, -1); // Inizializza a un valore non valido
-    private Vector3Int lastCorridorDirection = new Vector3Int(0, 0, 0);
     private Vector3Int rngDirection;
     private Vector3Int roomStart;
 
@@ -58,28 +69,18 @@ public class DungeonMiner : MonoBehaviour
 
     [SerializeField] Text text;
 
-    public enum VoxelType
+    private float actionTimer = 0f; // Timer per le azioni dell'agente
+    private float actionCooldown = 0.1f; // Tempo di attesa tra le azioni dell'agente, in secondi
+    #endregion params
+
+    void Awake()
     {
-        Default,
-        Agent,
-        Room,
-        Corridor,
-        Up,
-        NewLayer
+        gridSettings = GameObject.FindObjectOfType<GridSettings>();
+        InitializeGridAndChunks();
     }
-
-    // private VoxelType previousVoxelType = VoxelType.Default;
-
-    private class Voxel
-    {
-        public GameObject gameObject;
-        public VoxelType type;
-    }
-
+    
     void Start()
     {
-        gridSettings = GetComponent<GridSettings>();
-        InitializeGridAndChunks();
         SpawnAgentRandomly();
         rngDirection = possibleDirections[Random.Range(0, possibleDirections.Length)]; // Inizializza la direzione casuale
         PlaceRoom(agentPosition, 0, 0);
@@ -268,9 +269,9 @@ public class DungeonMiner : MonoBehaviour
         }
     }
 
-        #region AI
+    #region AI
 
-        void SpawnAgentRandomly()
+    void SpawnAgentRandomly()
     {
         // Calcola il centro della griglia
         Vector3Int center = new Vector3Int(gridWidth / 2, 0, gridDepth / 2);
@@ -476,7 +477,7 @@ public class DungeonMiner : MonoBehaviour
             } else { 
                 UpdateVoxel(agentPosition, VoxelType.Room); // Aggiorna il voxel alla posizione dell'agente
             }
-            currentPos = FindRoomEdge(start, direction) + direction;
+            currentPos = FindRoomEdge(start, direction);
         }
 
         // Check if all voxels of the corridor are valid
@@ -544,7 +545,7 @@ public class DungeonMiner : MonoBehaviour
                 return start; // Se raggiunge il limite, ritorna la posizione di partenza
             }
         }
-        return edgePosition - direction; // Ritorna la posizione appena fuori dalla stanza
+        return edgePosition; // Ritorna la posizione appena fuori dalla stanza
     }
 
     bool IsPositionValid(Vector3Int position)
