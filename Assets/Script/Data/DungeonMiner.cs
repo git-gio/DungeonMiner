@@ -86,36 +86,45 @@ public class DungeonMiner : MonoBehaviour
         PlaceRoom(agentPosition, 0, 0);
         DigCorridor(agentPosition, lastCorridorDirection, 0);
         UpdateChunkVisibility(agentPosition); // Aggiorna la visibilità in base alla posizione iniziale dell'agente
+
+        StartCoroutine(Mine());
     }
 
-    void Update()
+    IEnumerator Mine()
     {
-        if (!isGameOver)
+        while (true)
         {
-            // Timer per controllare la frequenza delle azioni dell'agente
-            if (actionTimer <= 0f)
+            if (!isGameOver)
             {
-                MakeDecision(); // Fai prendere una decisione all'agente su cosa fare
-                actionTimer = actionCooldown; // Resetta il timer
-                UpdateChunkVisibility(agentPosition); // Aggiorna la visibilità in base alla posizione dell'agente
+                // Timer per controllare la frequenza delle azioni dell'agente
+                if (actionTimer <= 0f)
+                {
+                    MakeDecision(); // Fai prendere una decisione all'agente su cosa fare
+                    actionTimer = actionCooldown; // Resetta il timer
+                    UpdateChunkVisibility(agentPosition); // Aggiorna la visibilità in base alla posizione dell'agente
+                }
+                else
+                {
+                    actionTimer -= Time.deltaTime; // Decrementa il timer
+                }
+            }
+            else if (isGameOver && alive)
+            {
+                Die();
+                alive = false;
+                text.enabled = true;
             }
             else
             {
-                actionTimer -= Time.deltaTime; // Decrementa il timer
+                // Controlla se il tasto Esc è stato premuto
+                if (Input.GetKeyDown(KeyCode.Escape))
+                {
+                    QuitGame();
+                    break;
+                }
             }
-        } 
-        else if (isGameOver && alive)
-        {
-            Die();
-            alive = false;
-            text.enabled = true;
-        } else
-        {
-            // Controlla se il tasto Esc è stato premuto
-            if (Input.GetKeyDown(KeyCode.Escape))
-            {
-                QuitGame();
-            }
+
+            yield return null;
         }
     }
 
