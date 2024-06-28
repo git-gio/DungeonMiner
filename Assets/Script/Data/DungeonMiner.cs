@@ -40,6 +40,7 @@ public class DungeonMiner : MonoBehaviour
     private Voxel[,,] grid;
 
     private Dictionary<Vector3Int, Chunk> chunks = new Dictionary<Vector3Int, Chunk>();
+    Chunk oldChunk;
 
     private Color color = Color.white;
     private float alpha = 1.0f;
@@ -84,8 +85,18 @@ public class DungeonMiner : MonoBehaviour
         SpawnAgentRandomly();
         rngDirection = possibleDirections[Random.Range(0, possibleDirections.Length)]; // Inizializza la direzione casuale
         PlaceRoom(agentPosition, 0, 0);
-        DigCorridor(agentPosition, lastCorridorDirection, 0);
-        UpdateChunkVisibility(agentPosition); // Aggiorna la visibilità in base alla posizione iniziale dell'agente
+        DigCorridor(agentPosition, lastCorridorDirection, 0); 
+
+        Vector3Int agentChunkIndex = new Vector3Int(agentPosition.x / gridSettings.chunkWidth, agentPosition.y / gridSettings.chunkHeight, agentPosition.z / gridSettings.chunkDepth);
+
+        Chunk startChunk = chunks[agentChunkIndex];
+
+        foreach (GameObject voxelGameObject in startChunk.voxels)
+        {
+            voxelGameObject.SetActive(true);
+        }
+
+        oldChunk = startChunk;
 
         StartCoroutine(Mine());
     }
@@ -99,9 +110,13 @@ public class DungeonMiner : MonoBehaviour
                 // Timer per controllare la frequenza delle azioni dell'agente
                 if (actionTimer <= 0f)
                 {
+                    previousAgentPosition = agentPosition; // Salva la posizione precedente dell'agente
                     MakeDecision(); // Fai prendere una decisione all'agente su cosa fare
                     actionTimer = actionCooldown; // Resetta il timer
-                    UpdateChunkVisibility(agentPosition); // Aggiorna la visibilità in base alla posizione dell'agente
+
+                    Vector3Int playerChunkIndex = new Vector3Int(previousAgentPosition.x / gridSettings.chunkWidth, previousAgentPosition.y / gridSettings.chunkHeight, previousAgentPosition.z / gridSettings.chunkDepth);
+                    if (agentPosition.x / gridSettings.chunkWidth != playerChunkIndex.x || agentPosition.y / gridSettings.chunkHeight != playerChunkIndex.y || agentPosition.z / gridSettings.chunkDepth != playerChunkIndex.z) // Se l'agente si sposta in un nuovo chunk
+                        UpdateChunkVisibility(previousAgentPosition); // Aggiorna la visibilità in base alla nuova posizione dell'agente
                 }
                 else
                 {
@@ -194,20 +209,21 @@ public class DungeonMiner : MonoBehaviour
 
     void UpdateChunkVisibility(Vector3Int playerPosition)
     {
-        Vector3Int playerChunkIndex = new Vector3Int(playerPosition.x / gridSettings.chunkWidth, playerPosition.y / gridSettings.chunkHeight, playerPosition.z / gridSettings.chunkDepth);
+        Vector3Int agentChunkIndex = new Vector3Int(agentPosition.x / gridSettings.chunkWidth, agentPosition.y / gridSettings.chunkHeight, agentPosition.z / gridSettings.chunkDepth);
 
-        foreach (KeyValuePair<Vector3Int, Chunk> entry in chunks)
+        Chunk newChunk = chunks[agentChunkIndex];
+
+        foreach (GameObject voxelGameObject in oldChunk.voxels)
         {
-            Vector3Int chunkIndex = entry.Key;
-            Chunk chunk = entry.Value;
-
-            bool shouldBeActive = chunkIndex.Equals(playerChunkIndex);
-
-            foreach (GameObject voxelGameObject in chunk.voxels)
-            {
-                voxelGameObject.SetActive(shouldBeActive);
-            }
+            voxelGameObject.SetActive(false);
         }
+
+        foreach (GameObject voxelGameObject in newChunk.voxels)
+        {
+            voxelGameObject.SetActive(true);
+        }
+
+        oldChunk = newChunk;
     }
     #endregion GridStuff
 
@@ -531,13 +547,15 @@ public class DungeonMiner : MonoBehaviour
         // creando una nuova stanza.
 
         UpdateVoxel(agentPosition, VoxelType.Up); // Aggiorna il voxel alla posizione dell'agente
-        
+        Vector3Int startPosition = agentPosition;
         agentPosition.y += 2;
         
         lastMoveRoomPlaced = false;
         lastMoveCorridorPlaced = false;
         newLayer = true;
+
         TryPlaceRoom();
+
         UpdateVoxel(agentPosition, VoxelType.NewLayer); // Aggiorna il voxel alla nuova posizione dell'agente
     }
 
